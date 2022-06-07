@@ -1,6 +1,14 @@
 # 710-Management 
 ## A management system for company and gang funds that works with all frameworks! 
 
+# Features 
+- Built in multijob with job change location! 
+- Custom Payrate PER player (Cause people should get raises before promotions!) 
+- Full boss management menu system! 
+- PayCycle built in via duty and Custom pay rates! 
+- Duty System with EASY export to see how many players are on duty instead of making some loop through online players (lol) 
+
+
 # Docs (Will be up in 1-2 days)
 http://kmack710.info/docs
 # Support 
