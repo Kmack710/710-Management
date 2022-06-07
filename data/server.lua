@@ -1,0 +1,718 @@
+local Framework = exports['710-lib']:GetFrameworkObject()
+
+local QBCore = {}
+
+if Config.Framework == 'qbcore' then 
+    QBCore = exports['qb-core']:GetCoreObject()
+end 
+
+RegisterCommand(Config.Important['CreateLocationCommand'],function(source, args, rawCommand)
+    local source = source
+    if Config.Important['AdminCheckForCommands'] then 
+        if Framework.AdminCheck(source) then 
+            TriggerClientEvent('710-Management:createLocationInput', source)
+        else 
+            local Player = Framework.PlayerDataS(source)
+            Player.Notify(Locales['NotAnAdmin'] ,'error')
+        end
+    else 
+        TriggerClientEvent('710-Management:createLocationInput', source)
+    end
+end, false)
+
+RegisterCommand(Config.Important['CreateADutyLocationCommand'],function(source, args, rawCommand)
+    local source = source
+    if Config.Important['AdminCheckForCommands'] then 
+        if Framework.AdminCheck(source) then 
+            TriggerClientEvent('710-Management:createDutyLocationInput', source)
+        else 
+            local Player = Framework.PlayerDataS(source)
+            Player.Notify(Locales['NotAnAdmin'] ,'error')
+        end
+    else 
+        TriggerClientEvent('710-Management:createLocationInput', source)
+    end
+end, false)
+
+RegisterCommand(Config.Important['ChangeJobCommand'],function(source, args, rawCommand)
+    local source = source
+    local Player = Framework.PlayerDataS(source)
+    local pid = Player.Pid 
+    local Job = JobCheck(pid) 
+    local Cjob = Player.Job.name 
+    local CGrade = Player.Job.Grade.level
+    local CPay = Job.payrate
+    local Sjob = Job.job2
+    local SGrade = Job.grade2
+    local SPay = Job.payrate2
+
+    if Config.Important['UsingUpdatedOx'] then 
+        MySQL.update('UPDATE management_staff SET job = @job, grade = @grade, payrate = @payrate, job2 = @job2, grade2 = @grade2, payrate2 = @payrate2  WHERE pid = @pid', {
+            ['@job'] = Sjob, 
+            ['@grade'] = SGrade,
+            ['@payrate'] = SPay,
+            ['@job2'] = Cjob, 
+            ['@grade2'] = CGrade,
+            ['@payrate2'] = CPay,
+            ['@pid'] = pid, 
+
+        })
+    else 
+        exports.oxmysql:execute('UPDATE management_staff SET job = @job, grade = @grade, payrate = @payrate, job2 = @job2, grade2 = @grade2, payrate2 = @payrate2  WHERE pid = @pid', {
+            ['@job'] = Sjob, 
+            ['@grade'] = SGrade,
+            ['@payrate'] = SPay,
+            ['@job2'] = Cjob, 
+            ['@grade2'] = CGrade,
+            ['@payrate2'] = CPay,
+            ['@pid'] = pid, 
+
+        })
+    end
+    Player.SetJob(Sjob, SGrade)
+    local Player = Framework.PlayerDataS(source)
+    
+    Player.Notify(Locales['ChangedJobNoti']..Player.Job.label..' - '..Player.Job.Grade.label)
+
+end, false)
+---- CreateNewDutyLocation
+RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, name, location)
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local accountCheck = GetManagementAccount(name)
+    if accountCheck == false then 
+        if Config.Important['UsingUpdatedOx'] then
+            MySQL.query.await('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+            --MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = location})
+        else 
+            exports.oxmysql:executeSync('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)})
+        end
+        Player.Notify(Locales['ManagementAccountCreated'], 'success')  
+        registerStashes()
+    else 
+        Player.Notify(Locales['ManagementAccountExists'], 'error')
+    end 
+end)
+
+RegisterNetEvent('710-Management:CreateNewDutyLocation', function(name, location)
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local accountCheck = GetManagementAccount(name)
+    debugPrint(json.encode(accountCheck))
+    debugPrint(location)
+    local dutylocation = location 
+    if accountCheck ~= false then 
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query.await('UPDATE management_accounts SET dutylocation = @dutylocation WHERE name = @name', {['@name'] = name, ['@dutylocation'] = json.encode(dutylocation)})
+            --MySQL.query('UPDATE management_accounts SET menu = @menu WHERE name = @name', {['@name'] = name, ['@menu'] = location})
+        else 
+            exports.oxmysql:executeSync('UPDATE management_accounts SET dutylocation = @dutylocation WHERE name = @name', {['@name'] = name, ['@dutylocation'] = json.encode(dutylocation)})
+        end
+    else 
+        Player.Notify(Locales['ManagementAccountNotExists'], 'error')
+    end
+
+end)
+
+function JobCheck(pid)
+    if Config.Important['UsingUpdatedOx'] then
+        local job = MySQL.query.await('SELECT * FROM management_staff WHERE pid = @pid', {['@pid'] = pid})
+        return job[1]
+    else 
+        local job = exports.oxmysql:executeSync('SELECT * FROM management_staff WHERE pid = @pid', {['@pid'] = pid})
+        return job[1]
+    end
+end 
+
+
+function registerStashes()  --- Only used for ox_inventory but can be used for other ones that need to register stashes on server side on resource start. QB only does this on client.
+    local dbinfo = GetManagementAccounts()
+    for k,v in pairs(dbinfo) do
+        debugPrint(v.name)
+        local stash = {
+            id = v.name.."-"..Locales['BossSafe'],
+            label = v.name..Locales['BossSafe'],
+            slots = 50,
+            weight = 100000
+        }
+        debugPrint('Registering stash: '..stash.id)
+        Framework.RegisterStash(stash.id, stash.label, stash.slots, stash.weight)
+    end
+end 
+
+AddEventHandler('onServerResourceStart', function(resourceName)
+    if resourceName == GetCurrentResourceName() then 
+        Wait(3000)
+        registerStashes()
+        debugPrint('^1Trying to register stashes...')
+    end
+end)
+
+RegisterNetEvent('710-Management:HireNewStaff', function(pSource, Pjob, grade)
+    if pSource ~= nil then 
+        local Player = Framework.PlayerDataS(pSource)
+        local pid = Player.Pid
+        Player.SetJob(Pjob, grade)
+        local Player = Framework.PlayerDataS(pSource) -- refresh Player data 
+        Player.Notify(Locales['YouHaveBeenHired']..Player.Job.label, 'success')
+        local payrate = {}
+        if Config.Framework == 'esx' then 
+            payrate = Player.Job.grade_salary
+        else 
+            payrate = Player.Job.payment
+        end
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
+        else
+            exports.oxmysql:execute('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
+        end
+
+    end
+end)
+
+
+RegisterNetEvent('710-Management:ChangeStaffRank', function(pid, Pjob, grade)
+    local employee = Framework.GetPlayerFromPidS(pid)
+    local source = source 
+    if employee then 
+        pSource = employee.Source
+        local Player = Framework.PlayerDataS(pSource)
+        Player.SetJob(Pjob, grade)
+        local Player = Framework.PlayerDataS(pSource)
+        Player.Notify(Locales['RankHasBeenChanged']..Player.Job.Grade.label, 'success')
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query('UPDATE `management_staff` SET grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@grade'] = grade})
+        else
+            exports.oxmysql:execute('UPDATE `management_staff` SET grade = @grade WHERE `pid` = @pid', {['@pid'] = pid,  ['@grade'] = grade})
+        end
+    else 
+        local Player = Framework.PlayerDataS(source)
+        Player.Notify(Locales['PlayerNotOnline'], 'error')
+    end
+end) 
+
+
+function GetManagementAccounts()
+    if Config.Important['UsingUpdatedOx'] then 
+        local Accounts = MySQL.query.await('SELECT * FROM `management_accounts`')
+        if Accounts ~= nil then
+            return Accounts
+        else 
+            print('No Management accounts have been made please create them ingame!')
+        end
+    else
+        local Accounts = exports.oxmysql:executeSync('SELECT * FROM `management_accounts`')
+        if Accounts ~= nil then
+            return Accounts
+        else 
+            print('No Management accounts have been made please create them ingame!')
+        end 
+    end 
+end 
+
+Framework.RegisterServerCallback('710-Mangement:GetAllAccounts', function(source, cb)
+    local source = source 
+    if source ~= nil then 
+        local Accounts = GetManagementAccounts()
+        if Accounts ~= nil then 
+            cb(Accounts)
+        else 
+            cb(false)
+        end 
+    else 
+        cb(false)
+    end
+end)
+
+Framework.RegisterServerCallback('710-Mangement:GetJobRanks', function(source, cb, job)
+    local source = source 
+    if source ~= nil then 
+        local ranks = GetJobRanks(job)
+        if ranks ~= nil then 
+            cb(ranks)
+        else 
+            cb(false)
+        end 
+    else 
+        cb(false)
+    end
+end)
+
+Framework.RegisterServerCallback('710-Mangement:GetJobStaff', function(source, cb, job)
+    if Config.Important['UsingUpdatedOx'] then 
+        local staff = MySQL.query.await('SELECT * FROM `management_staff` WHERE `job` = @job', {['@job'] = job})
+        if staff ~= nil then 
+            cb(staff)
+        else 
+            cb(false)
+        end
+    else 
+        local staff = exports.oxmysql:executeSync('SELECT * FROM `management_staff` WHERE `job` = @job', {['@job'] = job})
+        if staff ~= nil then 
+            cb(staff)
+        else 
+            cb(false)
+        end
+    end 
+end)
+
+function GetJobRanks(job)
+    if Config.Important['UsingUpdatedOx'] then 
+        local data = MySQL.query.await('SELECT * FROM job_grades WHERE job_name = @job', {['@job'] = job})
+        return data 
+    else
+        local data = exports.oxmysql:executeSync('SELECT * FROM job_grades WHERE job_name = @job', {['@job'] = job})
+        return data
+    end
+end 
+
+Framework.RegisterServerCallback('710-Mangement:GetAccount', function(source, cb, job)
+    local source = source 
+    if source ~= nil then 
+        local Account = GetManagementAccount(job)
+        if Account ~= nil then 
+            cb(Account)
+        else 
+            cb(false)
+        end 
+    else 
+        cb(false)
+    end
+end)
+
+function GetManagementAccount(name)
+    if Config.Important['UsingUpdatedOx'] then 
+        local Account = MySQL.query.await('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = name})
+        if Account[1] then 
+            return Account[1]
+        else 
+            return false
+        end
+    else
+        local Account = exports.oxmysql:executeSync('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = name})
+        if Account[1] then 
+            return Account[1]
+        else 
+            return false
+        end
+    end 
+end
+
+function AddAccountMoney(name, amount)
+    if Config.Important['UsingUpdatedOx'] then 
+        MySQL.query.await('UPDATE `management_accounts` SET `balance` = `balance` + @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
+    else
+        exports.oxmysql:executeSync('UPDATE `management_accounts` SET `balance` = `balance` + @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
+    end 
+end
+
+RegisterNetEvent('710-Management:BankingTransfer', function(action, Pjob, amount)
+    local source = source 
+    local amount = tonumber(amount)
+    local Player = Framework.PlayerDataS(source)
+    local account = GetManagementAccount(Pjob)
+    if Player.Job.name == Pjob then 
+        if action == 'deposit' then
+            if Player.Cash >= amount then 
+                Player.RemoveCash(amount)
+                Player.Notify(Locales['DepositSuccess']..' $'..amount, 'success')
+                AddAccountMoney(Pjob, amount)
+            else
+                Player.Notify(Locales['NotEnoughMoney'], 'error')
+            end 
+        elseif action == 'withdraw' then 
+            if account.balance >= amount then 
+                Player.AddCash(amount)
+                Player.Notify(Locales['WithdrawSuccess']..' $'..amount, 'success')
+                RemoveAccountMoney(Player.Job.name, amount)
+            else 
+                Player.Notify(Locales['NotEnoughMoney'], 'error')
+            end 
+        end 
+    else 
+        Player.Notify(Locales['YouAreNotInThisJob'], 'error')
+    end
+
+end)
+
+function RemoveAccountMoney(name, amount)
+    local currentAccount = GetManagementAccount(name)
+    if currentAccount.balance >= amount then 
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query.await('UPDATE `management_accounts` SET `balance` = `balance` - @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
+            return true
+        else
+            exports.oxmysql:executeSync('UPDATE `management_accounts` SET `balance` = `balance` - @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
+            return true
+        end
+    else 
+        return false
+    end 
+end
+
+function CheckEmployeesTable(pid)
+    if Config.Important['UsingUpdatedOx'] then 
+        local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
+        if data[1] then 
+            return data[1]
+        else 
+            return false
+        end
+    else
+        local data = exports.oxmysql:executeSync('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
+        if data[1] then 
+            return data[1]
+        else 
+            return false
+        end
+    end 
+end
+
+Framework.RegisterServerCallback('710-Management:GetMyJobInfo', function(source, cb, pid)
+    local source = source 
+    if source ~= "" then 
+        cb(CheckEmployeesTable(pid)) 
+    end
+end)
+
+RegisterNetEvent('710-Management:SetJobSalary', function(pid, payrate)
+    local Player = Framework.GetPlayerFromPidS(pid)
+    if Config.Important['UsingUpdatedOx'] then 
+        MySQL.query('UPDATE `management_staff` SET `payrate` = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate})
+    else
+        exports.oxmysql:execute('UPDATE `management_staff` SET `payrate` = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate})
+    end
+    if Player then 
+        Framework.NotiS(Player.Source, Locales['PayRateChanged']..payrate, 'success')
+    end 
+
+end)
+
+RegisterServerEvent('710-Management:PlayerLoadedS', function()
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local Payrate = {}
+    if Config.Framework == 'esx' then 
+        Payrate = Player.Job.grade_salary
+    else 
+        Payrate = Player.Job.payment
+    end 
+    debugPrint(Payrate)
+    if CheckEmployeesTable(Player.Pid) == false then 
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query.await('INSERT INTO `management_staff` (`pid`, `job`, `grade`, `payrate`, `name`) VALUES (@pid, @job, @grade, @payrate, @name)', {
+                ['@pid'] = Player.Pid, 
+                ['@job'] = Player.Job.name, 
+                ['@grade'] = Player.Job.Grade.level,
+                ['@payrate'] = Payrate,
+                ['@name'] = Player.Name,
+            })
+        else
+            exports.oxmysql:executeSync('INSERT INTO `management_staff` (`pid`, `job`, `grade`, `payrate`, `name`) VALUES (@pid, @job, @grade, @payrate, @name)', {
+                ['@pid'] = Player.Pid, 
+                ['@job'] = Player.Job.name, 
+                ['@grade'] = Player.Job.Grade.level,
+                ['@payrate'] = Payrate,
+                ['@name'] = Player.Name,
+            })
+        end
+        debugPrint('New Player Loaded in they are now added to employees table')
+    end
+    
+
+end)
+
+RegisterNetEvent('710-Management:PayStaffFromFunds', function()
+    debugPrint('PayStaffFromFunds')
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local pid = Player.Pid
+    local Jobinfo = JobCheck(pid)  
+    local PayRate = Jobinfo.payrate
+    local Jobname = Jobinfo.job
+    if Config.Management['PayFromAccount'] then 
+        if RemoveAccountMoney(Jobname, PayRate) then 
+            Player.AddBankMoney(PayRate)
+            Player.Notify(Locales['SalaryPaid']..' $'..PayRate, 'success')
+        else 
+            Player.Notify(Locales['SalaryFailed'], 'error')
+        end 
+    else 
+        Player.AddBankMoney(PayRate)
+        Player.Notify(Locales['SalaryPaid']..' $'..PayRate, 'success')
+    end 
+end)
+
+RegisterNetEvent('710-Management:PayWelfareCheck', function()
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    Player.AddBankMoney(Config.Management['WelfarePayAmount'])
+    Player.Notify(Locales['WelfarePaid'])
+end)
+
+
+
+function CheckIfPlayerOnDuty(source)
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local pid = Player.Pid 
+    if Config.Important['UsingUpdatedOx'] then 
+        local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
+        debugPrint(data[1].duty)
+        if data[1].duty == 1 then 
+            return true
+        else 
+            return false
+        end
+    else
+        local data = exports.oxmysql:executeSync('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
+        if data[1].duty == 1 then 
+            return true
+        else 
+            return false
+        end
+    end 
+end 
+
+function CheckHowManyStaffOnDuty(job)
+    if Config.Important['UsingUpdatedOx'] then 
+        local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `job` = @job AND `duty` = 1', {['@job'] = job})
+        if data[1] then 
+            return #data
+        else 
+            return 0
+        end
+    else
+        local data = exports.oxmysql:executeSync('SELECT * FROM `management_staff` WHERE `job` = @job AND `duty` = 1', {['@job'] = job})
+        if data[1] then 
+            return #data
+        else 
+            return 0
+        end
+    end
+end
+
+function GoOnDuty(pid, onDuty)
+    local setDuty = 0
+    if onDuty then setDuty = 1 end 
+    if Config.Important['UsingUpdatedOx'] then 
+        MySQL.query('UPDATE `management_staff` SET `duty` = @duty WHERE `pid` = @pid', {['@pid'] = pid, ['@duty'] = setDuty})
+    else
+        exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = @duty WHERE `pid` = @pid', {['@pid'] = pid, ['@duty'] = setDuty})
+    end
+end
+
+Framework.RegisterServerCallback('710-Management:AmIOnDuty', function(source, cb)
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local pid = Player.Pid 
+    if CheckIfPlayerOnDuty(source) then 
+        cb(true)
+    else 
+        cb(false)
+    end
+end)
+
+RegisterNetEvent('710-Management:ServerGoOnDuty', function()
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local dutyCheck = CheckIfPlayerOnDuty(source)
+    if dutyCheck == true then 
+        GoOnDuty(Player.Pid, false)
+        Player.Notify(Locales['YouAreOffDuty']..Player.Job.label, 'info')
+    else 
+        GoOnDuty(Player.Pid, true)
+        Player.Notify(Locales['YouAreOnDuty']..Player.Job.label, 'info')
+    end
+end)
+
+
+AddEventHandler('playerDropped', function()
+	local source = source
+	if source ~= "" then
+        debugPrint('Player Dropped -- Trying to put them off duty')
+		local Player = Framework.PlayerDataS(source)
+        local Pid = Player.Pid
+        local dutyCheck = CheckIfPlayerOnDuty(source)
+		if dutyCheck then
+            debugPrint('Player Dropped -- Putting them off duty')
+            GoOnDuty(Pid, false)
+            if Config.Framework == 'qbcore' then 
+                TriggerSeverEvent('QBCore:ToggleDuty')
+            end 
+		end
+	end
+end)
+
+RegisterNetEvent('710-Management:FireStaff', function(pid)
+    local source = source 
+    local Player = Framework.GetPlayerFromPidS(pid)
+    if Player then 
+        Player.SetJob('unemployed', 0)
+        Framework.NotiS(Player.Source, Locales['YouWereFiredFool'], 'info')
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query('UPDATE `management_staff` SET `duty` = 0, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
+        else 
+            exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 0, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
+        end
+        local bossPerson = Framework.PlayerDataS(source)
+        bossPerson.Notify(Locales['YouFired']..Player.Name, 'info')
+    else 
+        if Config.Important['UsingUpdatedOx'] then 
+            MySQL.query('UPDATE `management_staff` SET `duty` = 3, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
+        else 
+            exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 3, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
+        end
+    end
+    local bossPerson = Framework.PlayerDataS(source)
+    bossPerson.Notify(Locales['YouFired'].."Someone.", 'info') 
+    
+end) 
+
+RegisterNetEvent('710-Management:OfflinePlayerFired', function()
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    Player.SetJob('unemployed', 0)
+    Player.Notify(Locales['YouWereFiredFool'], 'info')
+    if Config.Important['UsingUpdatedOx'] then 
+        MySQL.query('UPDATE `management_staff` SET `duty` = 0 WHERE `pid` = @pid', {['@pid'] = Player.Pid})
+    else 
+        exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 0 WHERE `pid` = @pid', {['@pid'] = Player.Pid})
+    end
+end)
+
+--- Exports ---
+exports('GetManagementAccounts', GetManagementAccounts)
+exports('GetManagementAccount', GetManagementAccount)
+exports('AddAccountMoney', AddAccountMoney)
+exports('RemoveAccountMoney', RemoveAccountMoney)
+exports('CheckIfPlayerOnDuty', CheckIfPlayerOnDuty)
+exports('CheckHowManyStaffOnDuty', CheckHowManyStaffOnDuty)
+
+
+function debugPrint(msg)
+    if Config.Debug['debugPrint'] then 
+        print(msg)
+    end 
+end
+
+if Config.Framework == 'qbcore' then 
+    RegisterNetEvent('710-Management:ChangeGangRank', function(pid, Pgang, grade)
+        local IsGangMemberActive = Framework.GetPlayerFromPidS(pid)
+    
+        if IsGangMemberActive then 
+            local Player = Framework.PlayerDataS(IsGangMemberActive.Source)
+            Player.SetGang(Pgang, tonumber(grade))
+            local Player = Framework.PlayerDataS(IsGangMemberActive.Source)
+            Player.Notify(Locales['GangRankChanged']..Player.Gang.grade.name)
+    
+        else 
+            if Config.Important['UsingUpdatedOx'] then 
+                local data = MySQL.query.await("SELECT * FROM `players` WHERE `citizenid` = @citizenid", {['@citizenid'] = pid })
+                local gang = json.decode(data[1].gang)
+                gang.grade.level = tonumber(grade)
+                gang.grade.name = QBCore.Shared.Gangs[Pgang].grades[grade].name
+                MySQL.query("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
+            else 
+                local data = exports.oxmysql:executeSync("SELECT * FROM `players` WHERE `citizenid` = @citizenid", {['@citizenid'] = pid })
+                local gang = json.decode(data[1].gang)
+                gang.grade.level = tonumber(grade)
+                gang.grade.name = QBCore.Shared.Gangs[Pgang].grades[grade].name
+                exports.oxmysql:execute("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
+            end 
+        end 
+    
+    end)
+    
+    RegisterNetEvent('710-Management:RecruitNewGangMemberS', function(pSource, Pgang, grade)
+        local NewGangMember = Framework.PlayerDataS(pSource)
+        NewGangMember.SetGang(Pgang, tonumber(grade))
+        local Player = Framework.PlayerDataS(pSource)
+        Player.Notify(Locales['YouHaveBeenRecruitedGang']..Player.Gang.label, 'info')
+    end)
+    
+    RegisterNetEvent('710-Management:RemoveFromGang', function(pid)
+        local IsGangMemberActive = Framework.GetPlayerFromPidS(pid)
+    
+        if IsGangMemberActive then 
+            local Player = Framework.PlayerDataS(IsGangMemberActive.Source)
+            Player.SetGang('none', 0)
+            local Player = Framework.PlayerDataS(IsGangMemberActive.Source)
+            Player.Notify(Locales['GangRankChanged']..Player.Gang.grade.name)
+        else 
+            if Config.Important['UsingUpdatedOx'] then 
+                local gang = 'none'
+                gang.grade.level = 0
+                gang.grade.name = 'Unaffiliated'
+                gang.isboss = false
+                gang.label = 'No Affiliation'
+                gang.payment = 0
+    
+                MySQL.query("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
+            else 
+                local gang = 'none'
+                gang.grade.level = 0
+                gang.grade.name = 'Unaffiliated'
+                gang.isboss = false
+                gang.label = 'No Affiliation'
+                gang.payment = 0
+                exports.oxmysql:execute("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
+            end 
+        end 
+    
+    end)
+    
+    RegisterNetEvent('710-Management:BankingTransferGang', function(action, Pjob, amount)
+        local source = source 
+        local amount = tonumber(amount)
+        local Player = Framework.PlayerDataS(source)
+        local account = GetManagementAccount(Pjob)
+        if Player.Gang.name == Pjob then 
+            if action == 'deposit' then
+                if Player.Cash >= amount then 
+                    Player.RemoveCash(amount)
+                    Player.Notify(Locales['DepositSuccess']..' $'..amount, 'success')
+                    AddAccountMoney(Pjob, amount)
+                else
+                    Player.Notify(Locales['NotEnoughMoney'], 'error')
+                end 
+            elseif action == 'withdraw' then 
+                if account.balance >= amount then 
+                    Player.AddCash(amount)
+                    Player.Notify(Locales['WithdrawSuccess']..' $'..amount, 'success')
+                    RemoveAccountMoney(Player.Job.name, amount)
+                else 
+                    Player.Notify(Locales['NotEnoughMoney'], 'error')
+                end 
+            end 
+        else 
+            Player.Notify(Locales['YouAreNotInThisJob'], 'error')
+        end
+    
+    end)
+    
+    Framework.RegisterServerCallback('710-Management:GetPlayersInGang', function(source, cb, gang)
+        local Player = Framework.PlayerDataS(source)
+        debugPrint(gang)
+        debugPrint("^^^G^^^")
+        local GangMembers = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE '%".. gang .."%'", {})
+        
+        local GangMemberTable = {}
+        if GangMembers[1] ~= nil then 
+            for k, v in pairs(GangMembers) do
+                debugPrint(json.encode(v.gang))    
+                local GangPlayerActive = Framework.GetPlayerFromPidS(v.citizenid)
+                if GangPlayerActive then 
+                    GangMemberTable[#GangMemberTable+1] = {value = GangPlayerActive.Pid, text = GangPlayerActive.Name.." - "..GangPlayerActive.Gang.grade.name}
+                else 
+                    GangMemberTable[#GangMemberTable+1] = {value = v.citizenid, text = json.decode(v.charinfo).firstname .. ' ' .. json.decode(v.charinfo).lastname.." - "..json.decode(v.gang).grade.name}
+                end
+            end 
+            cb(GangMemberTable)
+            debugPrint('Sent Gang Table')
+        else 
+            
+            cb(false)
+        end 
+    end)
+end
