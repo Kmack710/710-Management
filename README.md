@@ -1,14 +1,12 @@
 # 710-Management 
 ## A management system for company and gang funds that works with all frameworks! 
-
 # Features 
 - Built in multijob with job change location! 
 - Custom Payrate PER player (Cause people should get raises before promotions!) 
 - Full boss management menu system! 
 - PayCycle built in via duty and Custom pay rates! 
 - Duty System with EASY export to see how many players are on duty instead of making some loop through online players (lol) 
-
-
+- okok Compatiblity! (only have ESX currently waiting to get qbcore version to make the right changes. But you might be able to get it from the ESX code if not it will be up here soon! :) 
 # Docs (Will be up in 1-2 days)
 http://kmack710.info/docs
 # Support 
@@ -26,14 +24,17 @@ If using QBCore then turn all jobs default duty to false so they will always log
 6. Okok Compatiblity available! (Will have snippets to replace on the Docs when they finished)
 
 ## Exports 
-```lua 
+```lua
+--- Server side exports  
 exports['710-Management']:GetManagementAccounts()
 exports['710-Management']:GetManagementAccount(name)
 exports['710-Management']:AddAccountMoney(name, amount)
 exports['710-Management']:RemoveAccountMoney(name, amount)
 exports['710-Management']:CheckIfPlayerOnDuty(source)
 exports['710-Management']:CheckHowManyStaffOnDuty(job)
-
+exports['710-Management']:CheckIfBossS(source, job) -- Checks if that player is a boss at the job you are looking for. 
+--- Client side exports 
+exports['710-Management']:CheckIfBossC(job) -- Checks if this player is boss. Can only be done client side on a player directly. Job is in here incase they are boss of another job and they highest grade is the same. 
 ```
 ```sql 
 CREATE TABLE `management_staff` (

@@ -20,6 +20,7 @@ Locales = {
    ['YouWereFiredFool'] = 'You have been Fired, Maybe work harder next time?', 
    ['YouFired'] = "You have fired ", 
    -- Menu stuffs 
+    ['ChangeJobs'] = "Change to your 2nd Job", 
     ['Button-For-Action'] = '[E]',
     ['SubmitButton'] = 'Submit', 
     ['BossGradeInputOption'] = 'Boss Grade (#)',
@@ -44,7 +45,9 @@ Locales = {
     ['OpenMangementMenu'] = 'Open Management Menu',
     --- target icons 
     ['ManagementIcon'] = "fa-solid fa-file-invoice-dollar",
-    ['DutyIcon'] = "fa-solid fa-file-invoice-dollar",
+    ['DutyIcon'] = "fa-solid fa-user-clock",
+    ['GangIcon'] = "fa-solid fa-skull-crossbones",
+    ['ChangeJobsIcon'] = "fa-solid fa-user-doctor", 
     -- other 
     ['BossSafe'] = 'BossSafe', --- for boss safe dont put spaces.
     ['Amount'] = "Amount",

@@ -34,7 +34,8 @@ RegisterCommand(Config.Important['CreateADutyLocationCommand'],function(source, 
     end
 end, false)
 
-RegisterCommand(Config.Important['ChangeJobCommand'],function(source, args, rawCommand)
+
+RegisterNetEvent('710-Manaagement:changeJobs', function()
     local source = source
     local Player = Framework.PlayerDataS(source)
     local pid = Player.Pid 
@@ -73,8 +74,8 @@ RegisterCommand(Config.Important['ChangeJobCommand'],function(source, args, rawC
     local Player = Framework.PlayerDataS(source)
     
     Player.Notify(Locales['ChangedJobNoti']..Player.Job.label..' - '..Player.Job.Grade.label)
+end)
 
-end, false)
 ---- CreateNewDutyLocation
 RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, name, location)
     local source = source 
@@ -98,8 +99,6 @@ RegisterNetEvent('710-Management:CreateNewDutyLocation', function(name, location
     local source = source 
     local Player = Framework.PlayerDataS(source)
     local accountCheck = GetManagementAccount(name)
-    debugPrint(json.encode(accountCheck))
-    debugPrint(location)
     local dutylocation = location 
     if accountCheck ~= false then 
         if Config.Important['UsingUpdatedOx'] then 
@@ -128,14 +127,12 @@ end
 function registerStashes()  --- Only used for ox_inventory but can be used for other ones that need to register stashes on server side on resource start. QB only does this on client.
     local dbinfo = GetManagementAccounts()
     for k,v in pairs(dbinfo) do
-        debugPrint(v.name)
         local stash = {
             id = v.name.."-"..Locales['BossSafe'],
             label = v.name..Locales['BossSafe'],
             slots = 50,
             weight = 100000
         }
-        debugPrint('Registering stash: '..stash.id)
         Framework.RegisterStash(stash.id, stash.label, stash.slots, stash.weight)
     end
 end 
@@ -144,7 +141,10 @@ AddEventHandler('onServerResourceStart', function(resourceName)
     if resourceName == GetCurrentResourceName() then 
         Wait(3000)
         registerStashes()
-        debugPrint('^1Trying to register stashes...')
+        Wait(6000)
+        print("^2▀▀█ ▄█ █▀█ ▄▄ █▀▄▀█ ▄▀█ █▄░█ ▄▀█ █▀▀ █▀▀ █▀▄▀█ █▀▀ █▄░█ ▀█▀\n░░█ ░█ █▄█ ░░ █░▀░█ █▀█ █░▀█ █▀█ █▄█ ██▄ █░▀░█ ██▄ █░▀█ ░█░")
+        print('^3Support available at guilded.gg/710')
+        print('^1Docs on Kmack710.info/Docs')
     end
 end)
 
@@ -222,7 +222,17 @@ Framework.RegisterServerCallback('710-Mangement:GetAllAccounts', function(source
     else 
         cb(false)
     end
-end)
+end)  
+
+Framework.RegisterServerCallback('710-Management:CheckIfBoss', function(source, cb, job)
+    local source = source 
+    if source ~= nil then 
+        local isBoss = CheckIfBossS(source, job)
+        cb(isBoss)
+    else 
+        cb(false)
+    end
+end) 
 
 Framework.RegisterServerCallback('710-Mangement:GetJobRanks', function(source, cb, job)
     local source = source 
@@ -337,7 +347,7 @@ end)
 
 function RemoveAccountMoney(name, amount)
     local currentAccount = GetManagementAccount(name)
-    if currentAccount.balance >= amount then 
+    if tonumber(currentAccount.balance) >= amount then 
         if Config.Important['UsingUpdatedOx'] then 
             MySQL.query.await('UPDATE `management_accounts` SET `balance` = `balance` - @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
             return true
@@ -397,7 +407,6 @@ RegisterServerEvent('710-Management:PlayerLoadedS', function()
     else 
         Payrate = Player.Job.payment
     end 
-    debugPrint(Payrate)
     if CheckEmployeesTable(Player.Pid) == false then 
         if Config.Important['UsingUpdatedOx'] then 
             MySQL.query.await('INSERT INTO `management_staff` (`pid`, `job`, `grade`, `payrate`, `name`) VALUES (@pid, @job, @grade, @payrate, @name)', {
@@ -416,14 +425,13 @@ RegisterServerEvent('710-Management:PlayerLoadedS', function()
                 ['@name'] = Player.Name,
             })
         end
-        debugPrint('New Player Loaded in they are now added to employees table')
+        print('New Player Loaded in they are now added to employees table')
     end
     
 
 end)
 
 RegisterNetEvent('710-Management:PayStaffFromFunds', function()
-    debugPrint('PayStaffFromFunds')
     local source = source 
     local Player = Framework.PlayerDataS(source)
     local pid = Player.Pid
@@ -450,6 +458,31 @@ RegisterNetEvent('710-Management:PayWelfareCheck', function()
     Player.Notify(Locales['WelfarePaid'])
 end)
 
+function CheckIfBossS(source, job)
+    local source = source 
+    local Player = Framework.PlayerDataS(source)
+    local PJob = Player.Job.name
+    local Jobgrade = Player.Job.Grade.level
+    if PJob == job then
+        if Config.Important['UsingUpdatedOx'] then 
+            local data = MySQL.query.await('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = job})
+            if data[1].bossgrade == Jobgrade then 
+                return true
+            else 
+                return false
+            end
+        else
+            local data = exports.oxmysql:executeSync('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = job})
+            if data[1].bossgrade == Jobgrade then 
+                return true
+            else 
+                return false
+            end
+        end
+    else 
+        return false
+    end 
+end
 
 
 function CheckIfPlayerOnDuty(source)
@@ -458,7 +491,6 @@ function CheckIfPlayerOnDuty(source)
     local pid = Player.Pid 
     if Config.Important['UsingUpdatedOx'] then 
         local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
-        debugPrint(data[1].duty)
         if data[1].duty == 1 then 
             return true
         else 
@@ -530,12 +562,10 @@ end)
 AddEventHandler('playerDropped', function()
 	local source = source
 	if source ~= "" then
-        debugPrint('Player Dropped -- Trying to put them off duty')
 		local Player = Framework.PlayerDataS(source)
         local Pid = Player.Pid
         local dutyCheck = CheckIfPlayerOnDuty(source)
 		if dutyCheck then
-            debugPrint('Player Dropped -- Putting them off duty')
             GoOnDuty(Pid, false)
             if Config.Framework == 'qbcore' then 
                 TriggerSeverEvent('QBCore:ToggleDuty')
@@ -588,13 +618,8 @@ exports('AddAccountMoney', AddAccountMoney)
 exports('RemoveAccountMoney', RemoveAccountMoney)
 exports('CheckIfPlayerOnDuty', CheckIfPlayerOnDuty)
 exports('CheckHowManyStaffOnDuty', CheckHowManyStaffOnDuty)
+exports('CheckIfBossS', CheckIfBossS)
 
-
-function debugPrint(msg)
-    if Config.Debug['debugPrint'] then 
-        print(msg)
-    end 
-end
 
 if Config.Framework == 'qbcore' then 
     RegisterNetEvent('710-Management:ChangeGangRank', function(pid, Pgang, grade)
@@ -693,14 +718,11 @@ if Config.Framework == 'qbcore' then
     
     Framework.RegisterServerCallback('710-Management:GetPlayersInGang', function(source, cb, gang)
         local Player = Framework.PlayerDataS(source)
-        debugPrint(gang)
-        debugPrint("^^^G^^^")
         local GangMembers = MySQL.query.await("SELECT * FROM `players` WHERE `gang` LIKE '%".. gang .."%'", {})
         
         local GangMemberTable = {}
         if GangMembers[1] ~= nil then 
-            for k, v in pairs(GangMembers) do
-                debugPrint(json.encode(v.gang))    
+            for k, v in pairs(GangMembers) do   
                 local GangPlayerActive = Framework.GetPlayerFromPidS(v.citizenid)
                 if GangPlayerActive then 
                     GangMemberTable[#GangMemberTable+1] = {value = GangPlayerActive.Pid, text = GangPlayerActive.Name.." - "..GangPlayerActive.Gang.grade.name}
@@ -709,7 +731,6 @@ if Config.Framework == 'qbcore' then
                 end
             end 
             cb(GangMemberTable)
-            debugPrint('Sent Gang Table')
         else 
             
             cb(false)

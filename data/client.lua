@@ -10,27 +10,19 @@ AddEventHandler('710-lib:PlayerLoaded', function()
     local Player = Framework.PlayerDataC()
     local Accounts = Framework.TriggerServerCallback('710-Mangement:GetAllAccounts')
     if Accounts then 
-        debugPrint('1')
-        debugPrint(json.encode(Player))
-        debugPrint(Player.Job.name)
         for k,v in pairs(Accounts) do 
             if v.name == Player.Job.name then 
                 local dutylocation = v.dutylocation
-                debugPrint('Duty Location loaded'..v.name)
                 startDutyLocations(Player.Job.name, dutylocation)
                 if Player.Job.Grade.level == v.bossgrade then
-                    debugPrint('BossMenu loaded'..v.name)
                     local menuLocation = v.menu  
                     startMenuLocation(Player.Job.name, menuLocation)
                 end
             end 
         end
         if Config.Framework == 'qbcore' then 
-            debugPrint(Player.Gang.name)
             for k, v in pairs(Accounts) do 
-                
                 if v.name == Player.Gang.name then
-                    debugPrint(v.name) 
                     TriggerEvent('710-Management:StartGangMenus', v.name, v.menu)
                 end 
             end 
@@ -45,22 +37,85 @@ AddEventHandler('710-lib:PlayerLoaded', function()
     if Player.Job.name == 'unemployed' then 
         PayWelfareCheck()
     end
+    if Config.Important['UsingBuiltInMultiJob'] then 
+        startChangeJobLocation()
+    end 
     TriggerServerEvent('710-Management:PlayerLoadedS') 
-    debugPrint('Player Loaded')
-    debugPrint(json.encode(Accounts))
-
 end)
+
+
 
 RegisterNetEvent('710-Management:ClientGoOnDuty', function()
     local Player = Framework.PlayerDataC()
     TriggerServerEvent('710-Management:ServerGoOnDuty')
     PayFromManagementFunds()
-    debugPrint('Client Go On Duty')
 end)
 
+function startChangeJobLocation()
+    local Location = Config.Important['ChangeJobLocation']
+    if Config.Important['UsingTarget'] then 
+        exports[Config.Important['TargetResource']]:AddBoxZone('JobChanger', vec3(Location.x, Location.y, Location.z), 2, 2, {
+            name='JobChanger',
+            heading=Location.w,
+            debugPoly=Config.Debug['PolyZones'],
+            minZ=Location.z - 1.2,
+            maxZ=Location.z + 1
+          }, {
+            options = {
+                {
+                    type = "server",
+                    event = "710-Manaagement:changeJobs",
+                    icon = Locales['ChangeJobsIcon'],
+                    label = Locales['ChangeJobs'],
+                  },
+            },
+             distance = 2.5 
+        })
+    else 
+        CreateThread(function()
+            local shownMenu = false
+            while true do
+                local sleep = 5
+                local text = Locales['Button-For-Action'].." "..Locales['ChangeJobs'] 
+                    local pos = GetEntityCoords(PlayerPedId())
+                    local inRange = false
+                    local nearMenu = false
+                    local menu = vector3(Location.x, Location.y, Location.z)
+                        if #(pos - menu) < 5.0 then
+                            inRange = true
+                            sleep = 5
+                                if #(pos - menu) <= 1.5 then
+                                    nearMenu = true
+                                    if IsControlJustReleased(0, Config.Important['Interact-Drawtext-Key']) then
+                                        TriggerServerEvent("710-Manaagement:changeJobs")
+                                        shownMenu = true
+                                        Framework.DrawText(close, nil)
+                                    end
+                                end       
+                        end
+                        if #(pos - menu) > 5.0 then 
+                            sleep = 5000      
+                        end
+    
+                    if nearMenu and not shownMenu then
+                        Framework.DrawText('open', text)
+                        shownMenu = true
+                    end
+        
+                    if not nearMenu and shownMenu then
+                        Framework.DrawText('close')
+                        shownMenu = false
+                    end
+                Wait(sleep)
+            end
+        end)
+
+    end  
+
+end
+
+
 function startDutyLocations(job, location)
-    debugPrint(job)
-    debugPrint(location)
     local Location = json.decode(location)
     if Config.Important['UsingTarget'] then 
         exports[Config.Important['TargetResource']]:AddBoxZone(job..'Duty', vec3(Location.x, Location.y, Location.z), 2, 2, {
@@ -125,8 +180,6 @@ function startDutyLocations(job, location)
 end
 
 function startMenuLocation(job, location)
-    debugPrint(job)
-    debugPrint(location)
     local Location = json.decode(location)
     if Config.Important['UsingTarget'] then 
         exports[Config.Important['TargetResource']]:AddBoxZone(job..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
@@ -185,11 +238,10 @@ function startMenuLocation(job, location)
                 Wait(sleep)
             end
         end)
-
     end 
-
-
 end
+
+
 
 RegisterNetEvent('710-Management:OpenBossSafe', function()
     local Player = Framework.PlayerDataC()
@@ -221,8 +273,6 @@ RegisterNetEvent('710-Management:createDutyLocationInput', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
-        debugPrint(location)
         TriggerServerEvent('710-Management:CreateNewDutyLocation', dialog.job, location)
 	end 
 end)
@@ -253,8 +303,6 @@ RegisterNetEvent('710-Management:createLocationInput', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
-        debugPrint(location)
         TriggerServerEvent('710-Management:CreateNewManagementMenu', dialog.bossgrade, dialog.job, location)
 	end 
 end)
@@ -346,11 +394,9 @@ RegisterNetEvent('710-Management:ManagementRecruitNew', function()
     local optionTable = {}
     if Config.Framework == 'esx' then 
         local PlayerRanks = Framework.TriggerServerCallback('710-Mangement:GetJobRanks', Pjob)
-        debugPrint(PlayerRanks)
 		for k,v in pairs(PlayerRanks) do
 			optionTable[#optionTable+1] = {value = v.grade, text = v.label}
 		end
-        debugPrint(json.encode(optionTable))
     else 
         for k,v in pairs(QBCore.Shared.Jobs[Pjob].grades) do
 			optionTable[#optionTable+1] = {value = k, text = v.name}
@@ -376,8 +422,6 @@ RegisterNetEvent('710-Management:ManagementRecruitNew', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
-        debugPrint(Pjob)
         TriggerServerEvent('710-Management:HireNewStaff', dialog.pSource, Pjob, dialog.grade)
 	end 
 end)
@@ -403,25 +447,11 @@ RegisterNetEvent('710-Management:ManageStaff', function()
         end 
         optionTable2[#optionTable2+1] = {value = v.pid, text = v.name.." - "..PlayerRank.." - "..Locales['PayAmount']..v.payrate}
     end
-    --[[for k,v in pairs(GetActivePlayers()) do 
-        local pSource = GetPlayerServerId(v)
-        debugPrint(pSource)
-        local LPlayer = Framework.PlayerDataC(pSource)
-        debugPrint(LPlayer.Name)
-        debugPrint('^^^^ ')
-        if LPlayer.Job.name == Pjob then
-            local PlayerJobPayTbl = Framework.TriggerServerCallback('710-Management:GetMyJobInfo', LPlayer.Pid) 
-            local PayRate = PlayerJobPayTbl.payrate
-            optionTable2[#optionTable+1] = {value = pSource, text = LPlayer.Name.." - "..LPlayer.Job.Grade.label.." - "..Locales['PayAmount']..PayRate}
-        end
-    end]]
     if Config.Framework == 'esx' then 
         local PlayerRanks = Framework.TriggerServerCallback('710-Mangement:GetJobRanks', Pjob)
-        debugPrint(PlayerRanks)
 		for k,v in pairs(PlayerRanks) do
 			optionTable[#optionTable+1] = {value = v.grade, text = v.label}
 		end
-        debugPrint(json.encode(optionTable))
     else 
         for k,v in pairs(QBCore.Shared.Jobs[Pjob].grades) do
 			optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
@@ -451,8 +481,6 @@ RegisterNetEvent('710-Management:ManageStaff', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
-        debugPrint(Pjob)
         if dialog.amount ~= '' then 
             TriggerServerEvent('710-Management:SetJobSalary', dialog.pSource, dialog.amount)
         else 
@@ -486,8 +514,6 @@ RegisterNetEvent('710-Management:AccountsMenu', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
-        debugPrint(Pjob)
         TriggerServerEvent('710-Management:BankingTransfer', dialog.action, Pjob, dialog.amount)
 	end 
 end)
@@ -513,7 +539,6 @@ RegisterNetEvent('710-Management:FireMenu', function()
 		},
 	})
 	if dialog ~= nil then
-		debugPrint(json.encode(dialog))
         TriggerServerEvent('710-Management:FireStaff', dialog.pid)
 	end 
 
@@ -526,19 +551,15 @@ function PayFromManagementFunds()
 	CreateThread(function()
         Wait(1000)
         local onDuty = Framework.TriggerServerCallback('710-Management:AmIOnDuty')
-        debugPrint(onDuty)
 		while onDuty do 
 			if Paidasdfdsafafd == false then 
-				debugPrint('Timer Started - PAYCYCLE')
 				Paidasdfdsafafd = true
 				Wait(Config.Management['PayCycleTime'] * 60000)
                 onDuty = Framework.TriggerServerCallback('710-Management:AmIOnDuty')
-				debugPrint('TIMER ENDED - PAYCYCLE ')
 				if onDuty then 
 					TriggerServerEvent('710-Management:PayStaffFromFunds')
 					Paidasdfdsafafd = false
 				else
-					debugPrint('Player left duty before pay time')
 					Paidasdfdsafafd = false
 					break
 				end
@@ -555,10 +576,8 @@ function PayWelfareCheck()
 	CreateThread(function()
 		while true do 
 			if Paidasdfdsafaf == false then 
-				debugPrint('Timer Started - PAYCYCLE')
 				Paidasdfdsafaf = true
 				Wait(Config.Management['PayCycleTime'] * 60000)
-				debugPrint('TIMER ENDED - PAYCYCLE ')
                 Paidasdfdsafaf = false
                 TriggerServerEvent('710-Management:PayWelfareCheck')
 				
@@ -569,11 +588,6 @@ function PayWelfareCheck()
 	end)
 end
 
-function debugPrint(msg)
-    if Config.Debug['debugPrint'] then 
-        print(msg)
-    end 
-end
 
 
 if Config.Framework == 'qbcore' then 
@@ -652,8 +666,6 @@ if Config.Framework == 'qbcore' then
             },
         })
         if dialog ~= nil then
-            debugPrint(json.encode(dialog))
-            debugPrint(Pjob)
             TriggerServerEvent('710-Management:BankingTransferGang', dialog.action, Pjob, dialog.amount)
         end 
     end)
@@ -685,8 +697,6 @@ if Config.Framework == 'qbcore' then
             },
         })
         if dialog ~= nil then
-            debugPrint(json.encode(dialog))
-            debugPrint(Pgang)
             TriggerServerEvent('710-Management:RecruitNewGangMemberS', dialog.pSource, Pgang, dialog.grade)
         end 
     end)
@@ -708,7 +718,6 @@ if Config.Framework == 'qbcore' then
     RegisterNetEvent('710-Management:ManageGang', function()
         local Player = Framework.PlayerDataC()
         local Pgang = Player.Gang.name
-        print(Pgang)
         local optionTable = {}
         local optionTable2 = Framework.TriggerServerCallback('710-Management:GetPlayersInGang', Pgang)
         for k,v in pairs(QBCore.Shared.Gangs[Pgang].grades) do
@@ -742,7 +751,6 @@ if Config.Framework == 'qbcore' then
             },
         })
         if dialog ~= nil then
-            debugPrint(json.encode(dialog))
             if dialog.action == 'changerank' then 
                 TriggerServerEvent('710-Management:ChangeGangRank', dialog.pid, Pgang, dialog.grade)
             elseif dialog.action == 'fire' then 
@@ -753,8 +761,6 @@ if Config.Framework == 'qbcore' then
     
     
     RegisterNetEvent('710-Management:StartGangMenus', function(gang, location)
-        debugPrint(gang)
-        debugPrint(location)
         local Location = json.decode(location)
         if Config.Important['UsingTarget'] then 
             exports[Config.Important['TargetResource']]:AddBoxZone(gang..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
@@ -816,4 +822,12 @@ if Config.Framework == 'qbcore' then
     
         end 
     end)
+end
+
+function CheckIfBossC(job)
+    local bossCheck = Framework.TriggerServerCallback('710-Management:CheckIfBoss', job)
+    return bossCheck
 end 
+
+
+exports('CheckIfBossC', CheckIfBossC)
