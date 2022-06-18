@@ -1,6 +1,6 @@
 local Framework = exports['710-lib']:GetFrameworkObject()
 local QBCore = {}
-
+local SharedGangData = {}
 if Config.Framework == 'qbcore' then 
     QBCore = exports['qb-core']:GetCoreObject()
 end 
@@ -28,6 +28,13 @@ AddEventHandler('710-lib:PlayerLoaded', function()
             end 
         end 
     end
+    if Config.Framework == 'qbcore' then 
+        if Config.Important['Using710-GangSystem'] then 
+            SharedGangData = Framework.TriggerServerCallback('710-Management:Get710Gangs')
+        else 
+            SharedGangData = QBCore.Shared.Gangs
+        end
+    end      
     local CheckIfFired = Framework.TriggerServerCallback('710-Management:GetMyJobInfo', Player.Pid)
     if CheckIfFired then 
         if CheckIfFired.duty == 3 then 
@@ -426,6 +433,7 @@ RegisterNetEvent('710-Management:ManagementRecruitNew', function()
 	end 
 end)
 
+
 RegisterNetEvent('710-Management:ManageStaff', function()
     local Player = Framework.PlayerDataC()
     local Pjob = Player.Job.name
@@ -674,7 +682,7 @@ if Config.Framework == 'qbcore' then
         local Player = Framework.PlayerDataC()
         local Pgang = Player.Gang.name
         local optionTable = {} 
-        for k,v in pairs(QBCore.Shared.Gangs[Pgang].grades) do
+        for k,v in pairs(SharedGangData[Pgang].grades) do
             optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
         end
         local dialog = exports[Config.Important['InputResource']]:ShowInput({
@@ -720,7 +728,7 @@ if Config.Framework == 'qbcore' then
         local Pgang = Player.Gang.name
         local optionTable = {}
         local optionTable2 = Framework.TriggerServerCallback('710-Management:GetPlayersInGang', Pgang)
-        for k,v in pairs(QBCore.Shared.Gangs[Pgang].grades) do
+        for k,v in pairs(SharedGangData[Pgang].grades) do
             optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
         end
         local dialog = exports[Config.Important['InputResource']]:ShowInput({

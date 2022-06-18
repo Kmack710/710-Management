@@ -1,7 +1,6 @@
 local Framework = exports['710-lib']:GetFrameworkObject()
-
 local QBCore = {}
-
+local SharedGangData = {}
 if Config.Framework == 'qbcore' then 
     QBCore = exports['qb-core']:GetCoreObject()
 end 
@@ -83,10 +82,32 @@ RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, n
     local accountCheck = GetManagementAccount(name)
     if accountCheck == false then 
         if Config.Important['UsingUpdatedOx'] then
-            MySQL.query.await('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+            if Config.Framework == 'qbcore' then 
+                local oldManagementAccount = MySQL.query.await('SELECT * FROM management_funds WHERE job_name = ?', {name})
+                if oldManagementAccount then 
+                    local balance = oldManagementAccount[1].amount 
+                    MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
+                    MySQL.query('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
+                else 
+                    MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+                end 
+            else 
+                MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
             --MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = location})
-        else 
-            exports.oxmysql:executeSync('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)})
+            end 
+        else
+            if Config.Framework == 'qbcore' then 
+                local oldManagementAccount = exports.oxmysql:executeSync('SELECT * FROM management_funds WHERE job_name = ?', {name})
+                if oldManagementAccount then 
+                    local balance = oldManagementAccount[1].amount 
+                    exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
+                    exports.oxmysql:execute('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
+                else 
+                    exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+                end 
+            else 
+                exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+            end
         end
         Player.Notify(Locales['ManagementAccountCreated'], 'success')  
         registerStashes()
@@ -94,6 +115,8 @@ RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, n
         Player.Notify(Locales['ManagementAccountExists'], 'error')
     end 
 end)
+
+
 
 RegisterNetEvent('710-Management:CreateNewDutyLocation', function(name, location)
     local source = source 
@@ -137,6 +160,28 @@ function registerStashes()  --- Only used for ox_inventory but can be used for o
     end
 end 
 
+if Config.Important['Using710-GangSystem'] then 
+    function Get710GangData()
+        local Gangs = {}
+        if Config.Important['updatedOxMySQL'] then 
+            Gangs = MySQL.query.await("SELECT * FROM 710_gangs")
+            local gangshit = {}
+            for k, v in pairs(Gangs) do 
+                gangshit[v.gang] = json.decode(v.gangdata)
+            end 
+            return gangshit
+        else 
+            Gangs = exports.oxmysql:executeSync("SELECT * FROM 710_gangs")
+            local gangshit = {}
+            for k, v in pairs(Gangs) do 
+                gangshit[v.gang] = json.decode(v.gangdata)
+            end 
+            return gangshit
+        end
+    end
+end  
+
+
 AddEventHandler('onServerResourceStart', function(resourceName)
     if resourceName == GetCurrentResourceName() then 
         Wait(3000)
@@ -145,6 +190,14 @@ AddEventHandler('onServerResourceStart', function(resourceName)
         print("^2▀▀█ ▄█ █▀█ ▄▄ █▀▄▀█ ▄▀█ █▄░█ ▄▀█ █▀▀ █▀▀ █▀▄▀█ █▀▀ █▄░█ ▀█▀\n░░█ ░█ █▄█ ░░ █░▀░█ █▀█ █░▀█ █▀█ █▄█ ██▄ █░▀░█ ██▄ █░▀█ ░█░")
         print('^3Support available at guilded.gg/710')
         print('^1Docs on Kmack710.info/Docs')
+        if Config.Framework == 'qbcore' then 
+            if Config.Important['Using710-GangSystem'] then 
+                SharedGangData = Get710GangData()
+                print('^1 710 Gang System is loaded be sure to REMOVE all gangs from qb-core/shared/Gangs besides NONE and create them from 710-GangSystem.')
+            else
+                SharedGangData = QBCore.Shared.Gangs
+            end
+        end
     end
 end)
 
@@ -636,19 +689,26 @@ if Config.Framework == 'qbcore' then
                 local data = MySQL.query.await("SELECT * FROM `players` WHERE `citizenid` = @citizenid", {['@citizenid'] = pid })
                 local gang = json.decode(data[1].gang)
                 gang.grade.level = tonumber(grade)
-                gang.grade.name = QBCore.Shared.Gangs[Pgang].grades[grade].name
+                gang.grade.name = SharedGangData[Pgang].grades[grade].name
                 MySQL.query("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
             else 
                 local data = exports.oxmysql:executeSync("SELECT * FROM `players` WHERE `citizenid` = @citizenid", {['@citizenid'] = pid })
                 local gang = json.decode(data[1].gang)
                 gang.grade.level = tonumber(grade)
-                gang.grade.name = QBCore.Shared.Gangs[Pgang].grades[grade].name
+                gang.grade.name = SharedGangData[Pgang].grades[grade].name
                 exports.oxmysql:execute("UPDATE `players` SET `gang` = @gang WHERE `citizenid` = @citizenid", {['@gang'] = json.encode(gang), ['@citizenid'] = pid })
             end 
         end 
     
     end)
     
+    Framework.RegisterServerCallback('710-Management:Get710Gangs', function(source, cb)
+        local Gangs = Get710GangData()
+        if Gangs then 
+            cb(Gangs)
+        end
+    end)
+
     RegisterNetEvent('710-Management:RecruitNewGangMemberS', function(pSource, Pgang, grade)
         local NewGangMember = Framework.PlayerDataS(pSource)
         NewGangMember.SetGang(Pgang, tonumber(grade))
