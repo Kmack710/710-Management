@@ -83,28 +83,35 @@ RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, n
     if accountCheck == false then 
         if Config.Important['UsingUpdatedOx'] then
             if Config.Framework == 'qbcore' then 
-                local oldManagementAccount = MySQL.query.await('SELECT * FROM management_funds WHERE job_name = ?', {name})
-                if oldManagementAccount then 
-                    local balance = oldManagementAccount[1].amount 
-                    MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
-                    MySQL.query('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
-                else 
+                if Config.Important['TransferDataFromQbManagement'] then 
+                    local oldManagementAccount = MySQL.query.await('SELECT * FROM management_funds WHERE job_name = ?', {name})
+                    if oldManagementAccount then 
+                        local balance = oldManagementAccount[1].amount 
+                        MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
+                        MySQL.query('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
+                    else 
+                        MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+                    end
+                else
                     MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
-                end 
+                end  
             else 
                 MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
-            --MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = location})
             end 
         else
-            if Config.Framework == 'qbcore' then 
-                local oldManagementAccount = exports.oxmysql:executeSync('SELECT * FROM management_funds WHERE job_name = ?', {name})
-                if oldManagementAccount then 
-                    local balance = oldManagementAccount[1].amount 
-                    exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
-                    exports.oxmysql:execute('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
+            if Config.Framework == 'qbcore' then
+                if Config.Important['TransferDataFromQbManagement'] then  
+                    local oldManagementAccount = exports.oxmysql:executeSync('SELECT * FROM management_funds WHERE job_name = ?', {name})
+                    if oldManagementAccount then 
+                        local balance = oldManagementAccount[1].amount 
+                        exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu, balance) VALUES (@name, @bossgrade, @menu, @balance)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location), ['@balance'] = balance})
+                        exports.oxmysql:execute('DELETE FROM management_funds WHERE job_name = @name', {['@name'] = name})
+                    else 
+                        exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
+                    end
                 else 
-                    exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
-                end 
+                    exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)})
+                end  
             else 
                 exports.oxmysql:execute('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
             end
