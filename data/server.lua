@@ -628,7 +628,7 @@ AddEventHandler('playerDropped', function()
 		if dutyCheck then
             GoOnDuty(Pid, false)
             if Config.Framework == 'qbcore' then 
-                TriggerSeverEvent('QBCore:ToggleDuty')
+                TriggerServerEvent('QBCore:ToggleDuty')
             end 
 		end
 	end
