@@ -1,7 +1,8 @@
 local Framework = exports['710-lib']:GetFrameworkObject()
+local GConfig = Framework.Config()
 local QBCore = {}
 local SharedGangData = {}
-if Config.Framework == 'qbcore' then 
+if GConfig.Framework == 'qbcore' then 
     QBCore = exports['qb-core']:GetCoreObject()
 end 
 
@@ -19,6 +20,21 @@ RegisterCommand(Config.Important['CreateLocationCommand'],function(source, args,
     end
 end, false)
 
+RegisterCommand(Config.Important['HireANewPlayerAdmin'],function(source, args, rawCommand)
+    local source = source
+    if Config.Important['AdminCheckForCommands'] then 
+        if Framework.AdminCheck(source) then 
+            TriggerClientEvent('710-Management:manageJobAdmin', source)
+        else 
+            local Player = Framework.PlayerDataS(source)
+            Player.Notify(Locales['NotAnAdmin'] ,'error')
+        end
+    else 
+        TriggerClientEvent('710-Management:manageJobAdmin', source)
+    end
+end, false)
+
+ -- 710-Management:manageJobAdmin
 RegisterCommand(Config.Important['CreateADutyLocationCommand'],function(source, args, rawCommand)
     local source = source
     if Config.Important['AdminCheckForCommands'] then 
@@ -46,7 +62,7 @@ RegisterNetEvent('710-Manaagement:changeJobs', function()
     local SGrade = Job.grade2
     local SPay = Job.payrate2
 
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         MySQL.update('UPDATE management_staff SET job = @job, grade = @grade, payrate = @payrate, job2 = @job2, grade2 = @grade2, payrate2 = @payrate2  WHERE pid = @pid', {
             ['@job'] = Sjob, 
             ['@grade'] = SGrade,
@@ -81,8 +97,8 @@ RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, n
     local Player = Framework.PlayerDataS(source)
     local accountCheck = GetManagementAccount(name)
     if accountCheck == false then 
-        if Config.Important['UsingUpdatedOx'] then
-            if Config.Framework == 'qbcore' then 
+        if GConfig.OxSQL == 'new' then
+            if GConfig.Framework == 'qbcore' then 
                 if Config.Important['TransferDataFromQbManagement'] then 
                     local oldManagementAccount = MySQL.query.await('SELECT * FROM management_funds WHERE job_name = ?', {name})
                     if oldManagementAccount then 
@@ -99,7 +115,7 @@ RegisterNetEvent('710-Management:CreateNewManagementMenu', function(bossgrade, n
                 MySQL.query('INSERT INTO management_accounts (name, bossgrade, menu) VALUES (@name, @bossgrade, @menu)', {['@name'] = name, ['@bossgrade'] = bossgrade, ['@menu'] = json.encode(location)}) 
             end 
         else
-            if Config.Framework == 'qbcore' then
+            if GConfig.Framework == 'qbcore' then
                 if Config.Important['TransferDataFromQbManagement'] then  
                     local oldManagementAccount = exports.oxmysql:executeSync('SELECT * FROM management_funds WHERE job_name = ?', {name})
                     if oldManagementAccount then 
@@ -131,7 +147,7 @@ RegisterNetEvent('710-Management:CreateNewDutyLocation', function(name, location
     local accountCheck = GetManagementAccount(name)
     local dutylocation = location 
     if accountCheck ~= false then 
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query.await('UPDATE management_accounts SET dutylocation = @dutylocation WHERE name = @name', {['@name'] = name, ['@dutylocation'] = json.encode(dutylocation)})
             --MySQL.query('UPDATE management_accounts SET menu = @menu WHERE name = @name', {['@name'] = name, ['@menu'] = location})
         else 
@@ -144,7 +160,7 @@ RegisterNetEvent('710-Management:CreateNewDutyLocation', function(name, location
 end)
 
 function JobCheck(pid)
-    if Config.Important['UsingUpdatedOx'] then
+    if GConfig.OxSQL == 'new' then
         local job = MySQL.query.await('SELECT * FROM management_staff WHERE pid = @pid', {['@pid'] = pid})
         return job[1]
     else 
@@ -194,10 +210,10 @@ AddEventHandler('onServerResourceStart', function(resourceName)
         Wait(3000)
         registerStashes()
         Wait(6000)
+
         print("^2▀▀█ ▄█ █▀█ ▄▄ █▀▄▀█ ▄▀█ █▄░█ ▄▀█ █▀▀ █▀▀ █▀▄▀█ █▀▀ █▄░█ ▀█▀\n░░█ ░█ █▄█ ░░ █░▀░█ █▀█ █░▀█ █▀█ █▄█ ██▄ █░▀░█ ██▄ █░▀█ ░█░")
         print('^3Support available at guilded.gg/710')
-        print('^1Docs on Kmack710.info/Docs')
-        if Config.Framework == 'qbcore' then 
+        if GConfig.Framework == 'qbcore' then 
             if Config.Important['Using710-GangSystem'] then 
                 SharedGangData = Get710GangData()
                 print('^1 710 Gang System is loaded be sure to REMOVE all gangs from qb-core/shared/Gangs besides NONE and create them from 710-GangSystem.')
@@ -205,6 +221,26 @@ AddEventHandler('onServerResourceStart', function(resourceName)
                 SharedGangData = QBCore.Shared.Gangs
             end
         end
+
+        CreateThread( function()
+            updatePath = "/Kmack710/710-Management" -- your git user/repo path
+            resourceName = GetCurrentResourceName() -- the resource name
+            function checkVersion(err,responseText, headers)
+                local curVersion = tonumber(1.1) -- make sure the "version" file actually exists in your resource root!
+                local rresponseText = tonumber(responseText)
+                if curVersion ~= rresponseText and curVersion < rresponseText then
+                    print("^1################# RESOURCE OUT OF DATE ###############################")
+                    print("^1"..resourceName.." is outdated, New Version: "..responseText.."Your Version: "..curVersion.." please update from https://github.com/Kmack710/710-Management")
+                    print("############### Please Download the newest version ######################")
+                elseif curVersion > rresponseText then
+                    print("^2"..resourceName.." is up to date, have fun!")
+                else
+                    print("^2"..resourceName.." is up to date, have fun!")
+                end
+            end
+            
+            PerformHttpRequest("https://raw.githubusercontent.com"..updatePath.."/master/version", checkVersion, "GET")
+        end)
     end
 end)
 
@@ -216,17 +252,38 @@ RegisterNetEvent('710-Management:HireNewStaff', function(pSource, Pjob, grade)
         local Player = Framework.PlayerDataS(pSource) -- refresh Player data 
         Player.Notify(Locales['YouHaveBeenHired']..Player.Job.label, 'success')
         local payrate = {}
-        if Config.Framework == 'esx' then 
+        if GConfig.Framework == 'esx' then 
             payrate = Player.Job.grade_salary
         else 
             payrate = Player.Job.payment
         end
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
         else
             exports.oxmysql:execute('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
         end
 
+    end
+end)
+
+RegisterNetEvent('710-Management:HireNewAdmin', function(pSource, Pjob, grade, payrate)
+    local source = source
+    if Framework.AdminCheck(source) then  
+        if pSource ~= nil then 
+            local Player = Framework.PlayerDataS(pSource)
+            local pid = Player.Pid
+            Player.SetJob(Pjob, grade)
+            local Player = Framework.PlayerDataS(pSource) -- refresh Player data 
+            Player.Notify(Locales['YouHaveBeenHired']..Player.Job.label, 'success')
+            if GConfig.OxSQL == 'new' then 
+                MySQL.query('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
+            else
+                exports.oxmysql:execute('UPDATE `management_staff` SET `payrate` = @payrate, `job` = @job, grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate, ['@job'] = Pjob, ['@grade'] = grade})
+            end
+
+        end
+    else 
+        Player.Notify(Locales['NotAnAdmin'], 'error')
     end
 end)
 
@@ -240,7 +297,7 @@ RegisterNetEvent('710-Management:ChangeStaffRank', function(pid, Pjob, grade)
         Player.SetJob(Pjob, grade)
         local Player = Framework.PlayerDataS(pSource)
         Player.Notify(Locales['RankHasBeenChanged']..Player.Job.Grade.label, 'success')
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query('UPDATE `management_staff` SET grade = @grade WHERE `pid` = @pid', {['@pid'] = pid, ['@grade'] = grade})
         else
             exports.oxmysql:execute('UPDATE `management_staff` SET grade = @grade WHERE `pid` = @pid', {['@pid'] = pid,  ['@grade'] = grade})
@@ -253,7 +310,7 @@ end)
 
 
 function GetManagementAccounts()
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local Accounts = MySQL.query.await('SELECT * FROM `management_accounts`')
         if Accounts ~= nil then
             return Accounts
@@ -309,7 +366,7 @@ Framework.RegisterServerCallback('710-Mangement:GetJobRanks', function(source, c
 end)
 
 Framework.RegisterServerCallback('710-Mangement:GetJobStaff', function(source, cb, job)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local staff = MySQL.query.await('SELECT * FROM `management_staff` WHERE `job` = @job', {['@job'] = job})
         if staff ~= nil then 
             cb(staff)
@@ -326,8 +383,10 @@ Framework.RegisterServerCallback('710-Mangement:GetJobStaff', function(source, c
     end 
 end)
 
+
+
 function GetJobRanks(job)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local data = MySQL.query.await('SELECT * FROM job_grades WHERE job_name = @job', {['@job'] = job})
         return data 
     else
@@ -351,7 +410,7 @@ Framework.RegisterServerCallback('710-Mangement:GetAccount', function(source, cb
 end)
 
 function GetManagementAccount(name)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local Account = MySQL.query.await('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = name})
         if Account[1] then 
             return Account[1]
@@ -369,7 +428,7 @@ function GetManagementAccount(name)
 end
 
 function AddAccountMoney(name, amount)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         MySQL.query.await('UPDATE `management_accounts` SET `balance` = `balance` + @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
     else
         exports.oxmysql:executeSync('UPDATE `management_accounts` SET `balance` = `balance` + @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
@@ -408,7 +467,7 @@ end)
 function RemoveAccountMoney(name, amount)
     local currentAccount = GetManagementAccount(name)
     if tonumber(currentAccount.balance) >= amount then 
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query.await('UPDATE `management_accounts` SET `balance` = `balance` - @amount WHERE `name` = @name', {['@name'] = name, ['@amount'] = amount})
             return true
         else
@@ -421,7 +480,7 @@ function RemoveAccountMoney(name, amount)
 end
 
 function CheckEmployeesTable(pid)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
         if data[1] then 
             return data[1]
@@ -447,7 +506,7 @@ end)
 
 RegisterNetEvent('710-Management:SetJobSalary', function(pid, payrate)
     local Player = Framework.GetPlayerFromPidS(pid)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         MySQL.query('UPDATE `management_staff` SET `payrate` = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate})
     else
         exports.oxmysql:execute('UPDATE `management_staff` SET `payrate` = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@payrate'] = payrate})
@@ -462,13 +521,13 @@ RegisterServerEvent('710-Management:PlayerLoadedS', function()
     local source = source 
     local Player = Framework.PlayerDataS(source)
     local Payrate = {}
-    if Config.Framework == 'esx' then 
+    if GConfig.Framework == 'esx' then 
         Payrate = Player.Job.grade_salary
     else 
         Payrate = Player.Job.payment
     end 
     if CheckEmployeesTable(Player.Pid) == false then 
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query.await('INSERT INTO `management_staff` (`pid`, `job`, `grade`, `payrate`, `name`) VALUES (@pid, @job, @grade, @payrate, @name)', {
                 ['@pid'] = Player.Pid, 
                 ['@job'] = Player.Job.name, 
@@ -524,7 +583,7 @@ function CheckIfBossS(source, job)
     local PJob = Player.Job.name
     local Jobgrade = Player.Job.Grade.level
     if PJob == job then
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             local data = MySQL.query.await('SELECT * FROM `management_accounts` WHERE `name` = @name', {['@name'] = job})
             if data[1].bossgrade == Jobgrade then 
                 return true
@@ -549,7 +608,7 @@ function CheckIfPlayerOnDuty(source)
     local source = source 
     local Player = Framework.PlayerDataS(source)
     local pid = Player.Pid 
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `pid` = @pid', {['@pid'] = pid})
         if data[1].duty == 1 then 
             return true
@@ -567,7 +626,7 @@ function CheckIfPlayerOnDuty(source)
 end 
 
 function CheckHowManyStaffOnDuty(job)
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         local data = MySQL.query.await('SELECT * FROM `management_staff` WHERE `job` = @job AND `duty` = 1', {['@job'] = job})
         if data[1] then 
             return #data
@@ -587,7 +646,7 @@ end
 function GoOnDuty(pid, onDuty)
     local setDuty = 0
     if onDuty then setDuty = 1 end 
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         MySQL.query('UPDATE `management_staff` SET `duty` = @duty WHERE `pid` = @pid', {['@pid'] = pid, ['@duty'] = setDuty})
     else
         exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = @duty WHERE `pid` = @pid', {['@pid'] = pid, ['@duty'] = setDuty})
@@ -611,9 +670,19 @@ RegisterNetEvent('710-Management:ServerGoOnDuty', function()
     local dutyCheck = CheckIfPlayerOnDuty(source)
     if dutyCheck == true then 
         GoOnDuty(Player.Pid, false)
+        if GConfig.Framework == 'qbcore' then 
+            if Player.QBDuty then 
+                Player.SetDuty(false)
+            end
+        end  
         Player.Notify(Locales['YouAreOffDuty']..Player.Job.label, 'info')
     else 
         GoOnDuty(Player.Pid, true)
+        if GConfig.Framework == 'qbcore' then 
+            if not Player.QBDuty then 
+                Player.SetDuty(true)
+            end
+        end  
         Player.Notify(Locales['YouAreOnDuty']..Player.Job.label, 'info')
     end
 end)
@@ -627,8 +696,10 @@ AddEventHandler('playerDropped', function()
         local dutyCheck = CheckIfPlayerOnDuty(source)
 		if dutyCheck then
             GoOnDuty(Pid, false)
-            if Config.Framework == 'qbcore' then 
-                TriggerServerEvent('QBCore:ToggleDuty')
+            if GConfig.Framework == 'qbcore' then
+                if Player.QBDuty then 
+                    Player.SetDuty(false)
+                end 
             end 
 		end
 	end
@@ -640,7 +711,7 @@ RegisterNetEvent('710-Management:FireStaff', function(pid)
     if Player then 
         Player.SetJob('unemployed', 0)
         Framework.NotiS(Player.Source, Locales['YouWereFiredFool'], 'info')
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query('UPDATE `management_staff` SET `duty` = 0, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
         else 
             exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 0, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
@@ -648,7 +719,7 @@ RegisterNetEvent('710-Management:FireStaff', function(pid)
         local bossPerson = Framework.PlayerDataS(source)
         bossPerson.Notify(Locales['YouFired']..Player.Name, 'info')
     else 
-        if Config.Important['UsingUpdatedOx'] then 
+        if GConfig.OxSQL == 'new' then 
             MySQL.query('UPDATE `management_staff` SET `duty` = 3, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
         else 
             exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 3, `job` = @job, grade = @grade, payrate = @payrate WHERE `pid` = @pid', {['@pid'] = pid, ['@job'] = 'unemployed', ['@grade'] = 0, ['@payrate'] = 0})
@@ -664,7 +735,7 @@ RegisterNetEvent('710-Management:OfflinePlayerFired', function()
     local Player = Framework.PlayerDataS(source)
     Player.SetJob('unemployed', 0)
     Player.Notify(Locales['YouWereFiredFool'], 'info')
-    if Config.Important['UsingUpdatedOx'] then 
+    if GConfig.OxSQL == 'new' then 
         MySQL.query('UPDATE `management_staff` SET `duty` = 0 WHERE `pid` = @pid', {['@pid'] = Player.Pid})
     else 
         exports.oxmysql:execute('UPDATE `management_staff` SET `duty` = 0 WHERE `pid` = @pid', {['@pid'] = Player.Pid})
@@ -681,7 +752,7 @@ exports('CheckHowManyStaffOnDuty', CheckHowManyStaffOnDuty)
 exports('CheckIfBossS', CheckIfBossS)
 
 
-if Config.Framework == 'qbcore' then 
+if GConfig.Framework == 'qbcore' then 
     RegisterNetEvent('710-Management:ChangeGangRank', function(pid, Pgang, grade)
         local IsGangMemberActive = Framework.GetPlayerFromPidS(pid)
     
@@ -692,7 +763,7 @@ if Config.Framework == 'qbcore' then
             Player.Notify(Locales['GangRankChanged']..Player.Gang.grade.name)
     
         else 
-            if Config.Important['UsingUpdatedOx'] then 
+            if GConfig.OxSQL == 'new' then 
                 local data = MySQL.query.await("SELECT * FROM `players` WHERE `citizenid` = @citizenid", {['@citizenid'] = pid })
                 local gang = json.decode(data[1].gang)
                 gang.grade.level = tonumber(grade)
@@ -732,7 +803,7 @@ if Config.Framework == 'qbcore' then
             local Player = Framework.PlayerDataS(IsGangMemberActive.Source)
             Player.Notify(Locales['GangRankChanged']..Player.Gang.grade.name)
         else 
-            if Config.Important['UsingUpdatedOx'] then 
+            if GConfig.OxSQL == 'new' then 
                 local gang = 'none'
                 gang.grade.level = 0
                 gang.grade.name = 'Unaffiliated'

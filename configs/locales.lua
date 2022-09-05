@@ -53,9 +53,6 @@ Locales = {
     ['Amount'] = "Amount",
     ['Action'] = "Action",
     ['PlayerNotOnline'] = 'This staff member is not currently awake!',
-      
-
-
     ---- GANG STUFF FOR QBCORE ONLY 
     ['ChangeGangRank'] = 'Change Rank',
     ['RemoveFromGang'] = 'Kick out of Gang',
@@ -70,6 +67,12 @@ Locales = {
     ['YouHaveBeenRecruitedGang'] = 'You have been recruited to ', 
     ['OpenGangMenu'] = 'Gang Management', 
 
+
+    -- NEW SINCE LAST UPDATE 
+    ['NewGrade'] = 'Grade to set player as',
+    ['JobsAvailable'] = 'Job',
+    ['StartingPayRate'] = 'Starting Pay rate',
+    
 
 }
 

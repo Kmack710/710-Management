@@ -6,9 +6,8 @@
 - Full boss management menu system! 
 - PayCycle built in via duty and Custom pay rates! 
 - Duty System with EASY export to see how many players are on duty instead of making some loop through online players (lol) 
-- okok Compatiblity! (only have ESX currently waiting to get qbcore version to make the right changes. But you might be able to get it from the ESX code if not it will be up here soon! :) 
-# Docs (Will be up in 1-2 days)
-http://kmack710.info/docs
+- okokBanking Compatiblity! 
+
 # Support 
 https://Guilded.gg/710 
 
@@ -16,12 +15,12 @@ https://Guilded.gg/710
 If using QBCore then turn all jobs default duty to false so they will always log in as false. This resource automatically puts them off duty when they log out! 
 
 ## Install (More detailed instructions will be on Docs when they are up in 1-2 days!)
-1. Make sure you have most up to date 710-lib 
+1. Make sure you have most up to date 710-lib v1.2 or higher! 
 2. Run all SQL files
 3. Read ALL Configs/Locales 
 4. Use the ingame commands found in config to set bossmenu and duty (Clock in / out locations)
 5. Make sure to turn off your payroll system and Default duty (So players will always log in off duty)
-6. Okok Compatiblity available! (Will have snippets to replace on the Docs when they finished)
+6. Okok Compatiblity available! (You have to reach out in guilded or discord and provide proof of okokbanking purchase since i have to send you the whole server.lua file.)
 
 ## Exports 
 ```lua

@@ -26,3 +26,5 @@ dependencies {
 }
 
 lua54 'yes'
+
+client_script '@710NightRP-Corestuffs/client/import.lua'

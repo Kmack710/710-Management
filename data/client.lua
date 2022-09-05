@@ -1,7 +1,8 @@
 local Framework = exports['710-lib']:GetFrameworkObject()
+local GConfig = Framework.Config()
 local QBCore = {}
 local SharedGangData = {}
-if Config.Framework == 'qbcore' then 
+if GConfig.Framework == 'qbcore' then 
     QBCore = exports['qb-core']:GetCoreObject()
 end 
 
@@ -20,7 +21,7 @@ AddEventHandler('710-lib:PlayerLoaded', function()
                 end
             end 
         end
-        if Config.Framework == 'qbcore' then 
+        if GConfig.Framework == 'qbcore' then 
             for k, v in pairs(Accounts) do 
                 if v.name == Player.Gang.name then
                     TriggerEvent('710-Management:StartGangMenus', v.name, v.menu)
@@ -28,7 +29,7 @@ AddEventHandler('710-lib:PlayerLoaded', function()
             end 
         end 
     end
-    if Config.Framework == 'qbcore' then 
+    if GConfig.Framework == 'qbcore' then 
         if Config.Important['Using710-GangSystem'] then 
             SharedGangData = Framework.TriggerServerCallback('710-Management:Get710Gangs')
         else 
@@ -61,7 +62,7 @@ end)
 function startChangeJobLocation()
     local Location = Config.Important['ChangeJobLocation']
     if Config.Important['UsingTarget'] then 
-        exports[Config.Important['TargetResource']]:AddBoxZone('JobChanger', vec3(Location.x, Location.y, Location.z), 2, 2, {
+        exports[GConfig.InputTarget]:AddBoxZone('JobChanger', vec3(Location.x, Location.y, Location.z), 2, 2, {
             name='JobChanger',
             heading=Location.w,
             debugPoly=Config.Debug['PolyZones'],
@@ -125,7 +126,7 @@ end
 function startDutyLocations(job, location)
     local Location = json.decode(location)
     if Config.Important['UsingTarget'] then 
-        exports[Config.Important['TargetResource']]:AddBoxZone(job..'Duty', vec3(Location.x, Location.y, Location.z), 2, 2, {
+        exports[GConfig.InputTarget]:AddBoxZone(job..'Duty', vec3(Location.x, Location.y, Location.z), 2, 2, {
             name=job..'Duty',
             heading=Location.w,
             debugPoly=Config.Debug['PolyZones'],
@@ -189,7 +190,7 @@ end
 function startMenuLocation(job, location)
     local Location = json.decode(location)
     if Config.Important['UsingTarget'] then 
-        exports[Config.Important['TargetResource']]:AddBoxZone(job..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
+        exports[GConfig.InputTarget]:AddBoxZone(job..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
             name=job..'Menu',
             heading=Location.w,
             debugPoly=Config.Debug['PolyZones'],
@@ -253,7 +254,7 @@ end
 RegisterNetEvent('710-Management:OpenBossSafe', function()
     local Player = Framework.PlayerDataC()
     local Pjob = Player.Job.name
-    if Config.Framework == 'esx' then 
+    if GConfig.Framework == 'esx' then 
         Framework.OpenStash(Pjob.."-"..Locales['BossSafe'], {Config.Management['MaxSafeWeight'], Config.Management['MaxSafeSlots']})
     else
         local stashLabel = Pjob.."_"..Locales['BossSafe']
@@ -266,7 +267,7 @@ RegisterNetEvent('710-Management:createDutyLocationInput', function()
     local pos = GetEntityCoords(playerPed)
     local heading = GetEntityHeading(playerPed)
     local location = vec4(pos.x, pos.y, pos.z, heading)
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = Locales['CreateDutyMenu'],
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -289,7 +290,7 @@ RegisterNetEvent('710-Management:createLocationInput', function()
     local pos = GetEntityCoords(playerPed)
     local heading = GetEntityHeading(playerPed)
     local location = vec4(pos.x, pos.y, pos.z, heading)
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = Locales['CreateManagementMenu'],
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -314,9 +315,56 @@ RegisterNetEvent('710-Management:createLocationInput', function()
 	end 
 end)
 
+RegisterNetEvent('710-Management:manageJobAdmin', function()
+    local Player = Framework.PlayerDataC()
+    local ManagementJobs = Framework.TriggerServerCallback('710-Mangement:GetAllAccounts')
+    local optionTable = {}
+    for k,v in pairs(ManagementJobs) do
+        optionTable[#optionTable+1] = {value = v.name, text = v.name}
+    end
+
+
+    local dialog = exports[GConfig.InputResource]:ShowInput({
+        header = Locales['CreateManagementMenu'],
+        submitText = Locales['SubmitButton'],
+        inputs = {
+            {
+                text = Locales['PlayerID'], 
+                name = "psource",
+                type = "number", -- type of the input
+                isRequired = true, -- Optional [accepted values: true | false] but will submit the form if no value is inputted
+                
+            },
+            {
+                text = Locales['JobsAvailable'], 
+                name = "job",
+                type = "select", 
+                options = optionTable,
+                -- default = "cash", -- Default radio option, must match a value from above, this is optional
+            },
+            {
+                text = Locales['NewGrade'], 
+                name = "newgrade",
+                type = "number", -- type of the input
+                isRequired = true, -- Optional [accepted values: true | false] but will submit the form if no value is inputted
+                
+            },
+            {
+                text = Locales['StartingPayRate'],
+                name = "payrate",
+                type = "number", -- type of the input
+                isRequired = true, -- Optional [accepted values: true | false] but will submit the form if no value is inputted
+            }
+        },
+    })
+    if dialog ~= nil then
+        TriggerServerEvent('710-Management:HireNewAdmin', dialog.psource, dialog.job, dialog.newgrade, dialog.payrate)
+    end 
+end)
+
 RegisterNetEvent('710-Management:OpenManagementMenu', function()
     local managementMenu = {}
-	if Config.Important['MenuResource'] == 'nh-context' then
+	if GConfig.MenuResource == 'nh-context' then
         managementMenu = {
             {
                 header = Locales['ManagementMenuTitle'],
@@ -391,7 +439,7 @@ RegisterNetEvent('710-Management:OpenManagementMenu', function()
             }
             
         }
-		exports[Config.Important['MenuResource']]:openMenu(managementMenu)
+		exports[GConfig.MenuResource]:openMenu(managementMenu)
 	end 
 end)
 
@@ -399,7 +447,7 @@ RegisterNetEvent('710-Management:ManagementRecruitNew', function()
     local Player = Framework.PlayerDataC()
     local Pjob = Player.Job.name
     local optionTable = {}
-    if Config.Framework == 'esx' then 
+    if GConfig.Framework == 'esx' then 
         local PlayerRanks = Framework.TriggerServerCallback('710-Mangement:GetJobRanks', Pjob)
 		for k,v in pairs(PlayerRanks) do
 			optionTable[#optionTable+1] = {value = v.grade, text = v.label}
@@ -409,7 +457,7 @@ RegisterNetEvent('710-Management:ManagementRecruitNew', function()
 			optionTable[#optionTable+1] = {value = k, text = v.name}
 		end
     end 
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = Locales['ManagementRecruit'],
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -443,7 +491,7 @@ RegisterNetEvent('710-Management:ManageStaff', function()
     
     local JobStaff = Framework.TriggerServerCallback('710-Mangement:GetJobStaff', Pjob)
     for k,v in pairs(JobStaff) do
-        if Config.Framework == 'esx' then 
+        if GConfig.Framework == 'esx' then 
             local PlayerRanks = Framework.TriggerServerCallback('710-Mangement:GetJobRanks', Pjob)
             for k2,v2 in pairs(PlayerRanks) do 
                 if v2.grade == v.grade then 
@@ -455,7 +503,7 @@ RegisterNetEvent('710-Management:ManageStaff', function()
         end 
         optionTable2[#optionTable2+1] = {value = v.pid, text = v.name.." - "..PlayerRank.." - "..Locales['PayAmount']..v.payrate}
     end
-    if Config.Framework == 'esx' then 
+    if GConfig.Framework == 'esx' then 
         local PlayerRanks = Framework.TriggerServerCallback('710-Mangement:GetJobRanks', Pjob)
 		for k,v in pairs(PlayerRanks) do
 			optionTable[#optionTable+1] = {value = v.grade, text = v.label}
@@ -465,7 +513,7 @@ RegisterNetEvent('710-Management:ManageStaff', function()
 			optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
 		end
     end 
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = Locales['ManagementRanks'],
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -501,7 +549,7 @@ RegisterNetEvent('710-Management:AccountsMenu', function()
     local Player = Framework.PlayerDataC()
     local Pjob = Player.Job.name
     local account = Framework.TriggerServerCallback('710-Mangement:GetAccount', Pjob)
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = "$"..account.balance,
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -534,7 +582,7 @@ RegisterNetEvent('710-Management:FireMenu', function()
     for k,v in pairs(JobStaff) do 
         optionTable[#optionTable+1] = {value = v.pid, text = v.name.." - "..Locales['PayAmount']..v.payrate}
     end
-    local dialog = exports[Config.Important['InputResource']]:ShowInput({
+    local dialog = exports[GConfig.InputResource]:ShowInput({
 		header = Locales['ManagementFire'],
 		submitText = Locales['SubmitButton'],
 		inputs = {
@@ -598,7 +646,7 @@ end
 
 
 
-if Config.Framework == 'qbcore' then 
+if GConfig.Framework == 'qbcore' then 
     RegisterNetEvent('710-Management:openGangMenu', function()
         local Player = Framework.PlayerDataC()
         local managementMenu = {
@@ -645,7 +693,7 @@ if Config.Framework == 'qbcore' then
                 
             }
         end 
-        exports[Config.Important['MenuResource']]:openMenu(managementMenu)
+        exports[GConfig.MenuResource]:openMenu(managementMenu)
     
     end)
     
@@ -653,7 +701,7 @@ if Config.Framework == 'qbcore' then
         local Player = Framework.PlayerDataC()
         local Pjob = Player.Gang.name
         local account = Framework.TriggerServerCallback('710-Mangement:GetAccount', Pjob)
-        local dialog = exports[Config.Important['InputResource']]:ShowInput({
+        local dialog = exports[GConfig.InputResource]:ShowInput({
             header = "$"..account.balance,
             submitText = Locales['SubmitButton'],
             inputs = {
@@ -685,7 +733,7 @@ if Config.Framework == 'qbcore' then
         for k,v in pairs(SharedGangData[Pgang].grades) do
             optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
         end
-        local dialog = exports[Config.Important['InputResource']]:ShowInput({
+        local dialog = exports[GConfig.InputResource]:ShowInput({
             header = Locales['RecruitNewGangMember'],
             submitText = Locales['SubmitButton'],
             inputs = {
@@ -731,7 +779,7 @@ if Config.Framework == 'qbcore' then
         for k,v in pairs(SharedGangData[Pgang].grades) do
             optionTable[#optionTable+1] = {value = tonumber(k), text = v.name}
         end
-        local dialog = exports[Config.Important['InputResource']]:ShowInput({
+        local dialog = exports[GConfig.InputResource]:ShowInput({
             header = Locales['ManagementRanks'],
             submitText = Locales['SubmitButton'],
             inputs = {
@@ -771,7 +819,7 @@ if Config.Framework == 'qbcore' then
     RegisterNetEvent('710-Management:StartGangMenus', function(gang, location)
         local Location = json.decode(location)
         if Config.Important['UsingTarget'] then 
-            exports[Config.Important['TargetResource']]:AddBoxZone(gang..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
+            exports[GConfig.InputTarget]:AddBoxZone(gang..'Menu', vec3(Location.x, Location.y, Location.z), 2, 2, {
                 name=gang..'Menu',
                 heading=Location.w,
                 debugPoly=Config.Debug['PolyZones'],
