@@ -325,7 +325,7 @@ RegisterNetEvent('710-Management:manageJobAdmin', function()
 
 
     local dialog = exports[GConfig.InputResource]:ShowInput({
-        header = Locales['CreateManagementMenu'],
+        header = Locales['ManagePlayersHeader'],
         submitText = Locales['SubmitButton'],
         inputs = {
             {

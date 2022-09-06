@@ -72,6 +72,7 @@ Locales = {
     ['NewGrade'] = 'Grade to set player as',
     ['JobsAvailable'] = 'Job',
     ['StartingPayRate'] = 'Starting Pay rate',
+    ['ManagePlayersHeader'] = 'Set Job of someone.'
     
 
 }
